@@ -21,17 +21,24 @@ from .staff import (
   update_menu_item,
   delete_menu_item
 )
+from .user import get_user_menu
 
 app = FastAPI()
 security = HTTPBearer()
 
-@app.post('/signup/users', tags=["users"])
+@app.post('/signup/users', tags=["user"])
 async def signup_users(user_data: SignUpSchema):
     return await auth_signup_users(user_data)
 
-@app.post('/login/users', tags=["users"])
+@app.post('/login/users', tags=["user"])
 async def login_users(user_data: LoginSchema):
     return await auth_login_users(user_data)
+
+@app.get("/user/menu", tags=["user"])
+async def get_student_menu_endpoint(
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    return await get_user_menu(credentials.credentials)
 
 @app.post('/signup/staffs', tags=["staff"])
 async def signup_staffs(user_data: StaffSignUpSchema):
