@@ -18,7 +18,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build  .
+          docker build -t greenplate-backend .
 
       - name: Run container (sanity check)
         run: |
