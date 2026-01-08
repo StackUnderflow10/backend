@@ -1,5 +1,6 @@
 # app/app.py
 
+import os
 from fastapi import FastAPI, Security, File, UploadFile
 #newly added for the cors problem 
 from fastapi.middleware.cors import CORSMiddleware
@@ -48,6 +49,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 security = HTTPBearer()
+
+@app.get("/health", tags=["health"])
+def health_check():
+    return {
+        "status": "ok",
+        "service": "greenplate-backend",
+        "environment": os.getenv("ENV", "development")
+    }
 
 @app.post('/auth/verify-staff', tags=["verify"])
 async def verify_staff(credentials: HTTPAuthorizationCredentials = Security(security)):

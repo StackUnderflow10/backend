@@ -3,12 +3,11 @@
 import os
 import firebase_admin
 from firebase_admin import credentials, firestore
-import pyrebase
-from .config import firebaseConfig
+from dotenv import load_dotenv
+
+load_dotenv()
 
 IS_CI = os.environ.get("CI") == "true"
-
-firebase = pyrebase.initialize_app(firebaseConfig)
 
 firebase_credentials = os.environ.get("FIREBASE_SERVICE_ACCOUNT")
 

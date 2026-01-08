@@ -1,105 +1,123 @@
-# GreenPlate Backend
+# GreenPlate — Backend (FastAPI)
 
-Lightweight FastAPI backend for managing college food stalls, menus, and staff. Uses Firebase Authentication + Firestore and supports AI-based menu extraction.
+A lightweight FastAPI backend for managing college food stalls, staff, and menus.
+It uses Firebase Authentication + Firestore and supports AI-assisted menu extraction (Google Gemini).
 
-## Quick highlights
-- Role-based access: `student`, `staff`, `manager`.
-- Staff/manager can manage a single assigned stall; managers can add/remove staff for that stall only.
-- Menu scanning: AI (Google Gemini) extracts item name/price from images.
+Purpose
+- Manage stalls, staff and menus for colleges.
+- Staff can upload and edit menus for their assigned stall only.
+- Managers can add/remove staff for their stall.
+- Optional image-based menu extraction returns JSON of item names and prices.
 
-## Quick start
-1. Create and activate a virtualenv:
-   ```bash
-   python -m venv .venv && source .venv/bin/activate
-   ```
+Tech stack
+- Python 3.13, FastAPI, Uvicorn
+- Firebase Authentication (pyrebase + firebase_admin) and Firestore
+- Google Generative AI (Gemini) for menu image parsing (optional)
+- Docker (Dockerfile + compose.yaml) provided
+
+Quick start (local)
+1. Create and activate a virtual environment:
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+```
+
 2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Provide Firebase service account (see `app/firebase_init.py`) via `FIREBASE_SERVICE_ACCOUNT` env var or `serviceAccountKey.json` (not committed).
-4. Run:
-   ```bash
-   python main.py
-   ```
-
-## Running with Docker
-You can run the app with Docker (image build + run) or with the provided compose file.
-
-- Build and run with Docker:
 
 ```bash
-# build image (from repo root where Dockerfile is located)
-docker build -t backend .
-
-# run container (map port 8000). Replace paths/env as needed.
-# -v mounts the Firebase service account (if you use a file)
-# --env-file points to your local .env containing required env vars
-docker run --rm -p 8000:8000 \
-  --env-file .env \
-  -v $(pwd)/serviceAccountKey.json:/app/serviceAccountKey.json:ro \
-  backend
+pip install -r requirements.txt
 ```
 
-- Using Docker Compose (recommended for development with compose file):
+3. Provide Firebase service account and env vars.
+   - Recommended: set FIREBASE_SERVICE_ACCOUNT to the full JSON content of the service account file.
+   - Alternatively mount a local file into the container (see Docker section) and set FIREBASE_SERVICE_ACCOUNT to its path.
+
+4. Run the app:
 
 ```bash
-# build and start in background
-docker compose -f compose.yaml up --build -d
-
-# stop and remove containers
-docker compose -f compose.yaml down
+python main.py
+# or
+uvicorn app.app:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Notes:
-- Ensure your `.env` (not committed) contains the Firebase and GEMINI keys, or pass them via `--env-file` or Docker secrets.
-- If you don't use a local `serviceAccountKey.json`, set `FIREBASE_SERVICE_ACCOUNT` (or whichever env var is read in `app/firebase_init.py`) with the JSON string or path as configured.
-- The app exposes port 8000 by default. Adjust `-p` or compose ports if needed.
+Docker
+- Build image and run (from repo root):
 
-## Auth and headers
-- All protected endpoints require a Firebase ID token in the `Authorization` header:
-  ```
-  Authorization: Bearer {idToken}
-  ```
-- Do NOT send the Firebase UID in the header — use the ID token issued after login.
+```bash
+docker build -t greenplate-backend .
+docker run --rm -p 8000:8000 --env-file .env -v $(pwd)/secrets:/app/secrets:ro greenplate-backend
+```
 
-## Core endpoints (summary)
-- `POST /signup/users` — student signup
-- `POST /login/users` — student login (returns `idToken`)
-- `POST /auth/verify-staff` — verify staff token and get role/stall
-- `POST /staff/menu` — upload menu items (staff only; restricted to their stall)
-- `POST /staff/menu/scan-image` — upload image to extract items via AI
-- `GET /user/menu` — students view menus for their college
-- Manager endpoints: `POST /staff/add-member`, `GET /staff/list`, `DELETE /staff/{staff_uid}`
+- With Docker Compose (recommended for local development):
 
-## Important rules
-- Stall-level authorization: staff actions check the authenticated staff's `stall_id` and reject attempts to modify other stalls (HTTP 403).
-- Tokens: ID tokens expire; if you receive `{"message": "Authorization header required"}` ensure the header is present and starts with `Bearer ` and the token is valid.
-- Image limits: JPEG/PNG, max ~5MB.
+```bash
+docker compose up --build
+docker compose down
+```
 
-## Project layout (relevant files)
-- `main.py` — application entry (starts FastAPI)
-- `app/app.py` — route mounting and FastAPI app
-- `app/auth.py` — authentication helpers and token verification
-- `app/firebase_init.py` — Firebase & Firestore initialization
-- `app/schema.py` — Pydantic schemas (requests/responses)
-- `app/staff.py` — staff & menu operations (upload/scan/manage)
-- `app/user.py` — student-facing menu retrieval
-- `app/manager.py` — manager/team operations
-- `get_token.py` — helper to generate test tokens (dev)
-- `compose.yaml`, `Dockerfile`, `README.Docker.md` — container/deployment materials
-- `requirements.txt` — Python dependencies
+Environment variables (important)
+- FIREBASE_SERVICE_ACCOUNT: JSON string or path to the service account key file used by firebase_admin.
+- FIREBASE_API_KEY, FIREBASE_AUTH_DOMAIN, FIREBASE_DATABASE_URL, FIREBASE_PROJECT_ID, FIREBASE_STORAGE_BUCKET, FIREBASE_MESSAGING_SENDER_ID, FIREBASE_APP_ID, FIREBASE_MEASUREMENT_ID — used by pyrebase client (see `app/config.py`).
+- GEMINI_API_KEY — required only if you use image scanning (`/staff/menu/scan-image`).
 
-## Notes for contributors
-- Read `app/firebase_init.py` to confirm how service account is provided in your environment.
-- Use the `/docs` UI (Swagger) at `http://localhost:8000/docs` for quick testing.
-- Keep `serviceAccountKey.json` and `.env` out of version control.
+Security / Auth headers
+- All protected endpoints require a Firebase ID token (not the UID) in the Authorization header:
 
-## Troubleshooting
-- "Authorization header required": ensure header key is exactly `Authorization` and value `Bearer <idToken>`.
-- 401 responses usually mean token invalid/expired; re-login to obtain a fresh ID token.
-- 403 means your role or stall assignment doesn't allow the action.
+```
+Authorization: Bearer {idToken}
+```
 
-## Contact
-- See repo `LICENSE` and top-level README for full project information.
+- You can obtain an ID token via the `/login/users` endpoint (or use `get_token.py` for tests).
+- If you receive {"message": "Authorization header required"} or 401, ensure the header key is exactly `Authorization` and the value starts with `Bearer ` followed by the idToken.
 
-Last updated: 2026-01-05
+Main endpoints (summary)
+- GET /health — health check
+
+Auth / User
+- POST /signup/users — Sign up a student (payload: email, password, confirm_password)
+- POST /login/users — Sign in (returns idToken)
+- GET /user/menu — List available menus for the student’s college (requires Bearer idToken)
+
+Staff / Manager
+- POST /auth/verify-staff — Verify token and initialize manager account (if email matches a stall email) — returns role, stall_id, college_id
+- POST /staff/menu — Upload menu JSON for a stall (staff only; stall_id must match the authenticated staff's stall)
+- GET /staff/menu — Get menu for the authenticated staff's stall
+- POST /staff/menu/scan-image — Upload an image; AI returns JSON array of items (name, price, description)
+- PATCH /staff/menu/{item_id} — Update a menu item (staff/manager for that stall)
+- DELETE /staff/menu/{item_id} — Delete a menu item (staff/manager for that stall)
+
+Manager-only
+- POST /staff/add-member — Add a staff member (manager only)
+- GET /staff/list — List staff members for the manager's stall
+- DELETE /staff/{staff_uid} — Remove a staff (manager only)
+- PUT /staff/{staff_uid}/email — Update staff email (manager only)
+
+Key behavior / rules
+- Stall-level authorization: staff/manager tokens are checked against `staffs` collection. A staff can only modify menu items for their assigned `stall_id`.
+- Manager initialization: when a verified token's email matches a stall's email and no staff document exists, the endpoint will create a manager record automatically.
+- Menu upload expects JSON matching the Pydantic schema `MenuSchema`:
+  - stall_id: string (must equal the staff's stall)
+  - items: list of {name: str, price: float (>0), description?: str, is_available?: bool}
+- Image scan returns a list of extracted items; results should be reviewed before saving (the AI may be imperfect).
+
+Testing tokens
+- Use `get_token.py` (dev helper) to exchange an existing Firebase user email/password for an idToken.
+- Or call POST /login/users to get idToken on successful sign-in.
+
+Troubleshooting
+- Authorization header required: Header missing or malformed. Ensure `Authorization: Bearer <idToken>`.
+- 401 Unauthorized: token invalid or expired — re-login to get a fresh idToken.
+- 403 Forbidden: trying to modify a stall you don’t belong to or role mismatch.
+- 413 Request Entity Too Large: uploaded image exceeds 5MB limit.
+
+Useful paths
+- API docs (Swagger): http://localhost:8000/docs
+
+Contributing
+- Keep secrets out of version control: do not commit `.env` or `secrets/serviceAccountKey.json`.
+- See `app/firebase_init.py` to understand service account loading.
+
+License
+- See LICENSE in repo root.
+
+Last updated: 2026-01-07
