@@ -1,21 +1,21 @@
 # app/auth.py
 
-import os, requests
-from .schema import LoginSchema, SignUpSchema
+import os
 from fastapi.responses import JSONResponse
 from starlette import status
 from firebase_admin import auth, firestore
 from .firebase_init import db
 
-FIREBASE_API_KEY = os.getenv("FIREBASE_API_KEY")
 
 def _create_response(status_code: int, message: str, **kwargs):
   content = {"message": message}
   content.update(kwargs)
   return JSONResponse(status_code=status_code, content=content)
 
+
 def _get_college_by_domain(email: str):
   try:
+    if not email: return None, None
     domain = email.split("@")[-1]
     query = (
       db.collection("colleges")
@@ -30,78 +30,62 @@ def _get_college_by_domain(email: str):
     print(f"College lookup error: {e}")
     return None, None
 
-def _validate_passwords(password: str, confirm_password: str):
-  if password != confirm_password:
-    return False, "Passwords do not match"
-  return True, ""
 
-async def auth_signup_users(user_data: SignUpSchema):
-  email = user_data.email
-  password = user_data.password
-  confirm_password = user_data.confirm_password
-
-  valid, msg = _validate_passwords(password, confirm_password)
-  if not valid:
-    return _create_response(status.HTTP_400_BAD_REQUEST, msg)
-
-  college_id, college_data = _get_college_by_domain(email)
-  if not college_id:
-    return _create_response(
-      status.HTTP_400_BAD_REQUEST,
-      "Your college domain is not registered with GreenPlate.",
-    )
+async def authenticate_student(token: str):
 
   try:
-    user = auth.create_user(email=email, password=password)
-    db.collection("users").document(user.uid).set(
-      {
-        "email": email,
-        "college_id": college_id,
-        "college_name": college_data.get("name"),
-        "role": "student",
-        "created_at": firestore.SERVER_TIMESTAMP,
-      }
-    )
-    return _create_response(
-      status.HTTP_201_CREATED, "User created successfully", uid=user.uid
-    )
-  except Exception as e:
-    return _create_response(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))
+    try:
+      decoded = auth.verify_id_token(token)
+    except Exception:
+      return _create_response(status.HTTP_401_UNAUTHORIZED, "Invalid or expired token")
 
+    uid = decoded["uid"]
+    email = decoded.get("email")
 
-async def auth_login_users(user_data: LoginSchema):
-  email = user_data.email
-  password = user_data.password
+    if not email:
+      return _create_response(status.HTTP_400_BAD_REQUEST, "Invalid token: Email required.")
 
-  college_id, _ = _get_college_by_domain(email)
-  if not college_id:
-    return _create_response(
-      status.HTTP_400_BAD_REQUEST,
-      "Your college domain is not registered.",
-    )
+    user_doc_ref = db.collection("users").document(uid)
+    user_doc = user_doc_ref.get()
 
-  try:
-    request_url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={FIREBASE_API_KEY}"
-    payload = {
-      "email": email,
-      "password": password,
-      "returnSecureToken": True
-    }
-    response = requests.post(request_url, json=payload)
-    response_data = response.json()
-
-    if response.status_code == 200:
+    if user_doc.exists:
       return _create_response(
         status.HTTP_200_OK,
         "Login successful",
-        idToken=response_data["idToken"],
+        role="student",
+        college_id=user_doc.to_dict().get("college_id")
       )
-    else:
-      error_msg = response_data.get("error", {}).get("message", "Login failed")
-      return _create_response(status.HTTP_401_UNAUTHORIZED, error_msg)
+
+    college_id, college_data = _get_college_by_domain(email)
+
+    if not college_id:
+      try:
+        auth.delete_user(uid)
+      except:
+        pass
+      return _create_response(
+        status.HTTP_403_FORBIDDEN,
+        "Your college domain is not registered with GreenPlate.",
+      )
+
+    user_doc_ref.set({
+      "email": email,
+      "college_id": college_id,
+      "college_name": college_data.get("name"),
+      "role": "student",
+      "created_at": firestore.SERVER_TIMESTAMP,
+    })
+
+    return _create_response(
+      status.HTTP_201_CREATED,
+      "User registered and logged in",
+      role="student",
+      college_id=college_id
+    )
 
   except Exception as e:
     return _create_response(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))
+
 
 async def verify_staff_access(token: str):
   try:
@@ -144,7 +128,6 @@ async def verify_staff_access(token: str):
       break
 
     if found_stall:
-
       new_staff_data = {
         "email": email,
         "stall_id": found_stall.id,

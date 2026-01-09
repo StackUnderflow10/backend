@@ -3,11 +3,6 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
-class SignUpSchema(BaseModel):
-    email: str
-    password: str
-    confirm_password: str
-
 class AddStaffSchema(BaseModel):
     email: str
 
@@ -16,10 +11,6 @@ class StaffAuthResponse(BaseModel):
     role: str
     stall_id: str
     college_id: str
-
-class LoginSchema(BaseModel):
-    email: str
-    password: str
 
 class UpdateStaffEmailSchema(BaseModel):
     new_email: str

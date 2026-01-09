@@ -5,8 +5,6 @@ from fastapi import FastAPI, Security, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from .schema import (
-  LoginSchema,
-  SignUpSchema,
   MenuSchema,
   AddStaffSchema,
   UpdateStaffEmailSchema,
@@ -14,8 +12,7 @@ from .schema import (
   MenuScanResponse
 )
 from .auth import (
-  auth_signup_users,
-  auth_login_users,
+  authenticate_student,
   verify_staff_access
 )
 from .staff import (
@@ -37,7 +34,6 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    
     allow_origins=[
         "http://localhost:5000",
         "http://127.0.0.1:5000",
@@ -57,17 +53,13 @@ def health_check():
         "environment": os.getenv("ENV", "development")
     }
 
-@app.post('/auth/verify-staff', tags=["verify"])
-async def verify_staff(credentials: HTTPAuthorizationCredentials = Security(security)):
+@app.post('/auth/verify-staff', tags=["auth"])
+async def verify_staff_endpoint(credentials: HTTPAuthorizationCredentials = Security(security)):
     return await verify_staff_access(credentials.credentials)
 
-@app.post('/signup/users', tags=["user"])
-async def signup_users(user_data: SignUpSchema):
-    return await auth_signup_users(user_data)
-
-@app.post('/login/users', tags=["user"])
-async def login_users(user_data: LoginSchema):
-    return await auth_login_users(user_data)
+@app.post('/auth/verify-student', tags=["auth"])
+async def verify_student_endpoint(credentials: HTTPAuthorizationCredentials = Security(security)):
+    return await authenticate_student(credentials.credentials)
 
 @app.get("/user/menu", tags=["user"])
 async def get_student_menu_endpoint(
