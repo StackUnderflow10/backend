@@ -32,7 +32,7 @@ from .manager import (
   remove_staff_member,
   update_staff_email,
 )
-from .user import get_user_menu, create_payment_order, get_user_orders
+from .user import get_user_menu, create_payment_order, get_user_orders,verify_payment_and_update_order
 from .webhook import router as webhook_router
 
 app = FastAPI()
@@ -88,6 +88,16 @@ async def get_student_orders_endpoint(
     credentials: HTTPAuthorizationCredentials = Security(security)
 ):
     return await get_user_orders(credentials.credentials)
+
+@app.post("/user/order/verify",tags=["user"])
+async def verify_order_endpoint(
+    payment_data: dict,
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    return await verify_payment_and_update_order(
+        payment_data,
+        credentials.credentials
+    )
 
 @app.post('/staff/add-member', tags=["manager"])
 async def add_staff_endpoint(

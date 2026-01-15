@@ -36,44 +36,101 @@ def serialize_firestore_data(data: dict):
 
 
 #to update the orders
-async def verify_payment_and_create_order(payment_data: dict, id_token: str):
+async def verify_payment_and_update_order(payment_data: dict, id_token: str):
     try:
-        user_data, user_uid = await get_user_details(id_token)
-        if not user_data:
-            return JSONResponse(status_code=401, content={"message": "Unauthorized"})
+        print("🔥 VERIFY CALLED")
+        print("🔥 PAYMENT DATA RECEIVED:", payment_data)
 
-        # 1. Verify Razorpay Signature
+        # 1️⃣ Check required fields
+        required_fields = [
+            "razorpay_order_id",
+            "razorpay_payment_id",
+            "razorpay_signature",
+            "internal_order_id"
+        ]
+
+        for field in required_fields:
+            if field not in payment_data:
+                print(f"❌ MISSING FIELD: {field}")
+                return JSONResponse(
+                    status_code=400,
+                    content={"message": f"Missing field: {field}"}
+                )
+
+        # 2️⃣ Verify Razorpay signature
         params_dict = {
-            'razorpay_order_id': payment_data['razorpay_order_id'],
-            'razorpay_payment_id': payment_data['razorpay_payment_id'],
-            'razorpay_signature': payment_data['razorpay_signature']
+            "razorpay_order_id": payment_data["razorpay_order_id"],
+            "razorpay_payment_id": payment_data["razorpay_payment_id"],
+            "razorpay_signature": payment_data["razorpay_signature"],
         }
-        
+
         try:
             razorpay_client.utility.verify_payment_signature(params_dict)
-        except Exception:
-            return JSONResponse(status_code=400, content={"message": "Payment verification failed"})
+            print("✅ SIGNATURE VERIFIED")
+        except Exception as e:
+            print("❌ SIGNATURE VERIFICATION FAILED:", str(e))
+            return JSONResponse(
+                status_code=400,
+                content={"message": "Signature verification failed"}
+            )
 
-        # 2. Save to Firestore 'orders' collection
-        order_doc_ref = db.collection("orders").document()
-        order_payload = {
-            "user_id": user_uid,
-            "stall_id": payment_data['stall_id'],
-            "items": payment_data['items'], # List of dicts
-            "total_amount": payment_data['amount'],
-            "razorpay_order_id": payment_data['razorpay_order_id'],
-            "razorpay_payment_id": payment_data['razorpay_payment_id'],
+        # 3️⃣ Find order in Firestore
+        internal_order_id = payment_data["internal_order_id"]
+        print("🔍 LOOKING FOR ORDER:", internal_order_id)
+
+        order_ref = db.collection("orders").document(internal_order_id)
+        order_doc = order_ref.get()
+
+        if not order_doc.exists:
+            print("❌ ORDER NOT FOUND IN FIRESTORE")
+            return JSONResponse(
+                status_code=400,
+                content={"message": "Order not found"}
+            )
+
+        # 4️⃣ Update order
+        order_ref.update({
+            "razorpay_payment_id": payment_data["razorpay_payment_id"],
             "status": "PAID",
-            "created_at": firestore.SERVER_TIMESTAMP,
             "updated_at": firestore.SERVER_TIMESTAMP
-        }
-        
-        order_doc_ref.set(order_payload)
-        
-        return JSONResponse(status_code=201, content={"message": "Order placed successfully", "order_id": order_doc_ref.id})
+        })
+
+        print("🎉 ORDER UPDATED TO PAID")
+
+        return JSONResponse(
+            status_code=200,
+            content={"message": "Payment verified & order updated"}
+        )
 
     except Exception as e:
-        return JSONResponse(status_code=500, content={"message": str(e)})
+        print("🔥 UNEXPECTED ERROR:", str(e))
+        return JSONResponse(
+            status_code=400,
+            content={"message": str(e)}
+        )
+
+    
+
+    #     # 2. Save to Firestore 'orders' collection
+    #     order_doc_ref = db.collection("orders").document()
+    #     order_payload = {
+    #         "user_id": user_uid,
+    #         "stall_id": payment_data['stall_id'],
+    #         "items": payment_data['items'], # List of dicts
+    #         "total_amount": payment_data['amount'],
+    #         "razorpay_order_id": payment_data['razorpay_order_id'],
+    #         "razorpay_payment_id": payment_data['razorpay_payment_id'],
+    #         "status": "PAID",
+    #         "created_at": firestore.SERVER_TIMESTAMP,
+    #         "updated_at": firestore.SERVER_TIMESTAMP
+    #     }
+        
+    #     order_doc_ref.set(order_payload)
+        
+    #     return JSONResponse(status_code=201, content={"message": "Order placed successfully", "order_id": order_doc_ref.id})
+
+    # except Exception as e:
+    #     return JSONResponse(status_code=500, content={"message": str(e)})
 
 async def get_user_menu(id_token: str):
     try:
@@ -210,7 +267,7 @@ async def create_payment_order(order_data: CreateOrderSchema, id_token: str):
       "stall_id": stall_id,
       "college_id": college_id,
       "items": order_items,
-      "amount": total_amount,
+      "total_amount": total_amount,
       "status": "PENDING",
       "created_at": firestore.SERVER_TIMESTAMP,
       "updated_at": firestore.SERVER_TIMESTAMP
