@@ -24,6 +24,10 @@ class MenuItemSchema(BaseModel):
     name: str
     price: float = Field(..., gt=0)
     description: Optional[str] = None
+    image_ref: Optional[str] = Field(
+      None,
+      description="Reference to menu image (URL, CDN key, or placeholder id)"
+    )
     is_available: bool = True
 
 class MenuSchema(BaseModel):
@@ -34,6 +38,7 @@ class UpdateMenuItemSchema(BaseModel):
   name: Optional[str] = None
   price: Optional[float] = None
   description: Optional[str] = None
+  image_ref: Optional[str] = None
   is_available: Optional[bool] = None
 
 class ExtractedMenuItem(BaseModel):
