@@ -185,6 +185,7 @@ async def get_staff_me(id_token: str):
     content={
       "uid": staff_uid,
       "email": staff_data.get("email"),
+      "name": staff_data.get("name"),
       "role": staff_data.get("role"),
       "stall_id": staff_data.get("stall_id"),
       "stall_name": stall_name,
@@ -221,11 +222,22 @@ async def update_staff_profile(profile_data: UpdateStaffProfileSchema, id_token:
 
     ref = db.collection("staffs").document(uid)
 
-    ref.update({
-      "name": profile_data.name,
-      "phone": profile_data.phone,
-      "updated_at": firestore.SERVER_TIMESTAMP
-    })
+    updates = {}
+
+    if profile_data.name is not None:
+      updates["name"] = profile_data.name.strip()
+
+    if profile_data.phone is not None:
+      updates["phone"] = profile_data.phone.strip()
+
+    if not updates:
+      return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"message": "No fields to update"}
+      )
+    updates["updated_at"] = firestore.SERVER_TIMESTAMP
+
+    ref.update(updates)
 
     return JSONResponse(
       status_code=status.HTTP_200_OK,

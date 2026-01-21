@@ -24,13 +24,15 @@ async def get_my_staff(id_token: str):
     staff_list = []
     for doc in staff_query:
       data = doc.to_dict()
-      if data.get("role") == "manager":
-        continue
+      # if data.get("role") == "manager":
+      #   continue
 
       staff_list.append({
         "uid": doc.id,
         "email": data.get("email"),
+        "name" : data.get("name"),
         "role": data.get("role"),
+        "status": data.get("status","inactive"),
         "added_at": data.get("created_at")
       })
 

@@ -15,14 +15,16 @@ class StaffAuthResponse(BaseModel):
 class UpdateStaffEmailSchema(BaseModel):
     new_email: str
 
+# --- FIX START ---
 class UpdateUserProfileSchema(BaseModel):
-  name: str = Field(..., min_length=2)
-  roll_number: str = Field(..., min_length=1)
-  phone: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=2)
+    roll_number: Optional[str] = Field(None, min_length=1)
+    phone: Optional[str] = None
 
 class UpdateStaffProfileSchema(BaseModel):
-  name: str = Field(..., min_length=2)
-  phone: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=2)
+    phone: Optional[str] = None
+# --- FIX END ---
 
 class MenuItemSchema(BaseModel):
     name: str
@@ -39,66 +41,66 @@ class MenuSchema(BaseModel):
     items: List[MenuItemSchema]
 
 class UpdateMenuItemSchema(BaseModel):
-  name: Optional[str] = None
-  price: Optional[float] = None
-  description: Optional[str] = None
-  image_ref: Optional[str] = None
-  is_available: Optional[bool] = None
+    name: Optional[str] = None
+    price: Optional[float] = None
+    description: Optional[str] = None
+    image_ref: Optional[str] = None
+    is_available: Optional[bool] = None
 
 class ExtractedMenuItem(BaseModel):
-  name: str = Field(..., description="The name of the food item")
-  price: Optional[float] = Field(None, description="The price of the item")
-  description: str = Field("", description="Short AI-generated description (6–7 words)")
+    name: str = Field(..., description="The name of the food item")
+    price: Optional[float] = Field(None, description="The price of the item")
+    description: str = Field("", description="Short AI-generated description (6–7 words)")
 
 class MenuScanResponse(BaseModel):
-  detected_items: List[ExtractedMenuItem]
-  count: int
-  message: str = "Scan complete. Please verify items before saving."
+    detected_items: List[ExtractedMenuItem]
+    count: int
+    message: str = "Scan complete. Please verify items before saving."
 
 class CartItemSchema(BaseModel):
-  item_id: str
-  quantity: int = Field(..., gt=0)
+    item_id: str
+    quantity: int = Field(..., gt=0)
 
 class CreateOrderSchema(BaseModel):
-  stall_id: str
-  items: List[CartItemSchema]
+    stall_id: str
+    items: List[CartItemSchema]
 
 class OrderItemSchema(BaseModel):
-  name: str
-  quantity: int
-  price: float
+    name: str
+    quantity: int
+    price: float
 
 class OrderResponseSchema(BaseModel):
-  order_id: str
-  user_id: str
-  amount: float
-  status: str
-  items: List[OrderItemSchema]
-  created_at: str
+    order_id: str
+    user_id: str
+    amount: float
+    status: str
+    items: List[OrderItemSchema]
+    created_at: str
 
 class UpdateOrderStatusSchema(BaseModel):
-  status: str
+    status: str
 
 class VerifyPaymentSchema(BaseModel):
-  razorpay_order_id: str
-  razorpay_payment_id: str
-  razorpay_signature: str
-  internal_order_id: str
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+    internal_order_id: str
 
 class VerifyPickupSchema(BaseModel):
-  order_id: str
-  pickup_code: str = Field(..., min_length=4, max_length=4, description="4-digit pickup code")
+    order_id: str
+    pickup_code: str = Field(..., min_length=4, max_length=4, description="4-digit pickup code")
 
 class StaffStats(BaseModel):
-  uid: str
-  name: str
-  email: str
-  role: str
-  month_total: int
-  today_total: int
-  last_active: Optional[str] = None
+    uid: str
+    name: str
+    email: str
+    role: str
+    month_total: int
+    today_total: int
+    last_active: Optional[str] = None
 
 class StallPerformanceResponse(BaseModel):
-  stall_id: str
-  period: str
-  staff_stats: List[StaffStats]
+    stall_id: str
+    period: str
+    staff_stats: List[StaffStats]

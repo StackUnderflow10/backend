@@ -44,12 +44,25 @@ async def update_user_profile(profile_data: UpdateUserProfileSchema, id_token: s
 
     user_ref = db.collection("users").document(user_uid)
 
-    user_ref.update({
-      "name": profile_data.name,
-      "roll_number": profile_data.roll_number,
-      "phone": profile_data.phone,
-      "updated_at": firestore.SERVER_TIMESTAMP
-    })
+    updates = {}
+
+    if profile_data.name is not None:
+       updates["name"] = profile_data.name.strip()
+      
+    if profile_data.roll_number is not None:
+       updates["roll_number"] = profile_data.roll_number.strip()
+
+    if profile_data.phone is not None:
+       updates["phone"] = profile_data.phone.strip()
+
+    if not updates:
+       return JSONResponse(
+          status_code=status.HTTP_400_BAD_REQUEST,
+          content={"message": "No fields to update"}
+       )
+    updates["updated_at"] = firestore.SERVER_TIMESTAMP
+
+    user_ref.update(updates)
 
     return JSONResponse(
       status_code=status.HTTP_200_OK,
@@ -195,6 +208,8 @@ async def create_payment_order(order_data: CreateOrderSchema, id_token: str):
       .document(stall_id)
       .collection("menu_items")
     )
+    stall_doc = db.collection("colleges").document(college_id).collection("stalls").document(stall_id).get()
+    stall_name = stall_doc.to_dict().get("name", "Unknown Stall")
 
     for cart_item in order_data.items:
       item_doc = menu_ref.document(cart_item.item_id).get()
@@ -244,6 +259,7 @@ async def create_payment_order(order_data: CreateOrderSchema, id_token: str):
       "user_id": user_uid,
       "user_details": user_snapshot,
       "stall_id": stall_id,
+      "stall_name": stall_name,
       "college_id": college_id,
       "items": order_items,
       "total_amount": total_amount,
@@ -313,7 +329,7 @@ async def get_user_orders(id_token: str):
       orders.append({
          "id": doc.id,
          "items": data["items"],
-         "cafeteriaName": data.get("stall_id", "Unknown Stall"),
+         "cafeteriaName": data.get("stall_name", "Unknown Stall"),
          "status": normalize_order_status(data["status"]),
          "qrCode": visible_code,
         "total_amount": data.get("total_amount", 0)
