@@ -116,3 +116,6 @@ class ResaleItemSchema(BaseModel):
 class CancelOrderResponse(BaseModel):
   message: str
   resale_created: bool = False
+
+class UpdateResalePriceSchema(BaseModel):
+    new_price: float

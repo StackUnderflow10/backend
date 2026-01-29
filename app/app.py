@@ -1,4 +1,4 @@
- # app/app.py
+# app/app.py
 
 import os
 from fastapi import FastAPI, Security, File, UploadFile
@@ -15,7 +15,8 @@ from .schema import (
   UpdateUserProfileSchema,
   VerifyPickupSchema,
   VerifyPaymentSchema,
-  UpdateStaffProfileSchema
+  UpdateStaffProfileSchema,
+  UpdateResalePriceSchema # <--- ADDED THIS IMPORT
 )
 from .auth import (
   authenticate_student,
@@ -33,7 +34,9 @@ from .staff import (
   get_staff_me,
   verify_order_pickup,
   activate_staff,
-  update_staff_profile
+  update_staff_profile,
+  get_stall_resale_items,
+  update_resale_price
 )
 from .manager import (
   get_my_staff,
@@ -268,3 +271,18 @@ async def verify_pickup_endpoint(
     credentials: HTTPAuthorizationCredentials = Security(security)
 ):
     return await verify_order_pickup(verify_data, credentials.credentials)
+    
+
+@app.get("/staff/resale/items", tags=["staff"])
+async def get_staff_resale_items_endpoint(
+    credenitals: HTTPAuthorizationCredentials = Security(security)
+):
+    return await get_stall_resale_items(credenitals.credentials)
+
+@app.patch("/staff/resale/{resale_id}/price", tags=["staff"])
+async def update_resale_price_endpoint(
+    resale_id: str,
+    body: UpdateResalePriceSchema,
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    return await update_resale_price(resale_id, body.new_price, credentials.credentials)

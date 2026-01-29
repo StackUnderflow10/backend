@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import json
 import google.generativeai as genai
 from fastapi import UploadFile
-from .schema import MenuSchema, UpdateMenuItemSchema, AddStaffSchema, UpdateOrderStatusSchema, VerifyPickupSchema, UpdateStaffProfileSchema
+from .schema import MenuSchema, UpdateMenuItemSchema, AddStaffSchema, UpdateOrderStatusSchema, VerifyPickupSchema, UpdateStaffProfileSchema, UpdateResalePriceSchema
 from fastapi.responses import JSONResponse
 from starlette import status
 from .firebase_init import db
@@ -700,3 +700,69 @@ async def verify_order_pickup(verify_data: VerifyPickupSchema, id_token: str):
 
   except Exception as e:
     return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"message": str(e)})
+
+
+async def get_stall_resale_items(id_token: str):
+  try:
+    staff_data, _ = await get_staff_details(id_token)
+    if not staff_data:
+      return JSONResponse(status_code=401, content={"message": "Unauthorized"})
+
+    stall_id = staff_data.get("stall_id")
+
+    # Fetch available or reserved resale items for this stall
+    docs = (
+        db.collection("resale_items")
+        .where("stall_id", "==", stall_id)
+        .where("status", "in", ["AVAILABLE", "RESERVED"])
+        .order_by("created_at", direction=firestore.Query.DESCENDING)
+        .stream()
+    )
+
+    items = []
+    for doc in docs:
+        data = doc.to_dict()
+        data["resale_id"] = doc.id
+        data = serialize_firestore_data(data)
+        items.append(data)
+
+    return JSONResponse(status_code=200, content=items)
+
+  except Exception as e:
+    return JSONResponse(status_code=500, content={"message": str(e)})
+
+async def update_resale_price(resale_id: str, new_price: float, id_token: str):
+  try:
+    staff_data, _ = await get_staff_details(id_token)
+    if not staff_data:
+      return JSONResponse(status_code=401, content={"message": "Unauthorized"})
+
+    stall_id = staff_data.get("stall_id")
+    resale_ref = db.collection("resale_items").document(resale_id)
+    doc = resale_ref.get()
+
+    if not doc.exists:
+        return JSONResponse(status_code=404, content={"message": "Item not found"})
+
+    data = doc.to_dict()
+    
+    if data.get("stall_id") != stall_id:
+        return JSONResponse(status_code=403, content={"message": "Unauthorized access to this item"})
+
+    max_price = data.get("max_price", data.get("discounted_price"))
+
+    if new_price > max_price:
+        return JSONResponse(
+            status_code=400, 
+            content={"message": f"Price cannot be higher than ₹{max_price}"}
+        )
+
+    resale_ref.update({
+        "discounted_price": new_price,
+        "updated_at": firestore.SERVER_TIMESTAMP
+    })
+
+    return JSONResponse(status_code=200, content={"message": "Price updated successfully"})
+
+  except Exception as e:
+    return JSONResponse(status_code=500, content={"message": str(e)})
